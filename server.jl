@@ -5,33 +5,55 @@ include("./pages/UserBiometrics.jl")
 
 
 function stack(handlers)
-  function handle(index, req, res)
-    request, response = handlers[index](req, res)
-    @show index
-    @show request
-    @show response
+  reversed = reverse(handlers)
 
-    if request != nothing && index < length(handlers)
-      handle(index + 1, request, response)
+  function compose(index, func)
+    if index < length(reversed)
+      next = index + 1
+      child = reversed[next] 
+      composed = func ∘ child
+
+      return compose(next, composed)
     else
-      Response(response)
+      return func
     end
   end
 
-  return function(req, res)
-    handle(1, req, res)
+
+  return function(args)
+    index = 1
+    app = compose(index, reversed[index])
+    request, response = app(args)
+
+    return response
   end
 end
 
 
-function hello(req, res)
-  @show "heloo"
+function hello(args)
+  req, res = args
+
+  @show "hello"
+
   return req, res
 end
 
-function hi(req, res)
-  return nothing, "hi"
+function hi(args)
+  req, res = args
+  @show "hi"
+
+  req.resource == "/" ? (req, "hi") : (req, res)
 end
+
+# function predicate(args)
+#   req, res = args
+#   req.resource = "/test" ? route(args) : args
+# end
+
+# function route()
+
+# end
+
 
 handlers = [hello, hi]
 
@@ -39,10 +61,10 @@ function app(req, res)
   @show req.method
   @show req.resource
   @show req.headers
+  args = (req, res)
 
   handle = stack(handlers)
-
-  handle(req, res)
+  handle(args)
 
 end
 
